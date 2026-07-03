@@ -1,0 +1,24 @@
+# Environments & Dependencies
+backend/.env
+backend/.venv/
+frontend/node_modules/
+frontend/.next/
+
+# Data & Uploads (Excluding candidate data)
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/reports/*
+!backend/reports/.gitkeep
+database/copilot.db
+database/copilot.db-journal
+
+# Python caches
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
