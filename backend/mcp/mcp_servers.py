@@ -56,7 +56,7 @@ class SecurityAgent:
         # Validate Browser Operations
         elif tool_name in ["research_company", "research_common_skills", "research_role_trends", "research_certifications_and_topics"]:
             query_input = args.get("company_name", "") or args.get("role", "") or args.get("query", "")
-            blocked_keywords = ["rm ", "sh ", "sudo", "exec", "http://", "https://", "flag", "key", "password", "secret"]
+            blocked_keywords = ["rm ", "sh ", "sudo", "exec", "flag", "password", "secret"]
             for keyword in blocked_keywords:
                 if keyword in query_input.lower():
                     raise PermissionError(f"Security Agent: Suspicious browser search query blocked: contains '{keyword}'.")

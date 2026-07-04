@@ -29,7 +29,7 @@ import {
 
 interface HistoryItem {
   id: number;
-  resume_filename: str;
+  resume_filename: string;
   timestamp: string;
   ats_score: number;
   job_role: string;
