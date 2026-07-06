@@ -224,6 +224,21 @@ async def run_workflow_stream(resume_path: str, job_role: str, job_description: 
                 
                 # yield final completion
                 yield {"data": json.dumps({"agent": "report_generator", "status": "completed", "summary": "Final report generated successfully", "result": result_data})}
+        
+        # Post-loop cleanup to yield completion for the leftover active agent (e.g. career_coach)
+        if active_agent:
+            latest_session = await runner.session_service.get_session(app_name="app", user_id="local_user", session_id=session.id)
+            agent_output = latest_session.state.get(active_agent)
+            summary_msg = get_agent_summary(active_agent, agent_output)
+            yield {"data": json.dumps({"agent": active_agent, "status": "completed", "summary": summary_msg})}
+            
+        # Guarantee final report completion event is yielded
+        latest_session = await runner.session_service.get_session(app_name="app", user_id="local_user", session_id=session.id)
+        final_report = latest_session.state.get("final_report")
+        if final_report:
+            if hasattr(final_report, "model_dump"):
+                final_report = final_report.model_dump()
+            yield {"data": json.dumps({"agent": "report_generator", "status": "completed", "summary": "Final report generated successfully", "result": final_report})}
                 
     except Exception as e:
         yield {"data": json.dumps({"error": str(e)})}

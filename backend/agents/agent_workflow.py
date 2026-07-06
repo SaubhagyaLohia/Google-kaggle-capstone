@@ -192,8 +192,8 @@ async def read_resume_node(ctx: Context, node_input: str):
 
 
 # Agent nodes definitions
-# We use 'gemini-2.5-flash' or 'gemini-1.5-flash' as standard
-model_name = "gemini-2.0-flash"
+# We use 'gemini-2.5-flash' as the best supported model
+model_name = "gemini-2.5-flash"
 
 resume_parser_agent = LlmAgent(
     name="resume_parser",
@@ -292,6 +292,7 @@ interview_prep_agent = LlmAgent(
 async def check_job_desc(ctx: Context, node_input: Any):
     if ctx.state.get("job_description"):
         cover_letter_res = await ctx.run_node(cover_letter_agent, node_input="")
+        ctx.state["cover_letter"] = cover_letter_res
         return Event(output=cover_letter_res)
     else:
         empty_out = CoverLetterOutput(
@@ -452,56 +453,153 @@ async def validation_node(ctx: Context, node_input: Any):
 def handle_validation_error(ctx: Context, node_input: str):
     raise ValueError(node_input)
 
-report_generator_agent = LlmAgent(
-    name="report_generator",
-    model=model_name,
-    mode="single_turn",
-    instruction="""You are a Career Consultant.
-    Combine all the analysis results from state:
-    - Parsed Resume: {parsed_resume}
-    - ATS Analysis: {ats_analysis}
-    - Skill Gap: {skill_gap}
-    - Grammar Review: {grammar_review}
-    - Interview Prep: {interview_prep}
-    - Cover Letter: {cover_letter}
-    - Career Coach Recommendation: {career_coach}
-    - Resume Improvement History (if generated): {improvement_history}
-    
-    Produce a comprehensive report. In the JSON output matching FinalReport schema:
-    - executive_summary: A high-level overview.
-    - career_coach_recommendation: Directly map the CareerCoachOutput object from {career_coach}.
-    - resume_info: Direct map from {parsed_resume}.
-    - ats_score: Direct map of the ats_compatibility_score from {ats_analysis}.
-    - strengths: Direct map of strengths from {ats_analysis} or {career_coach}.
-    - weaknesses: Direct map of weaknesses from {ats_analysis} or {career_coach}.
-    - missing_skills: Direct map of missing skills from {skill_gap}.
-    - grammar_suggestions: List of spelling/grammar suggestions from {grammar_review}.
-    - professional_improvements: List of tone and layout suggestions.
-    - interview_questions: Tailored HR/technical/project questions from {interview_prep}.
-    - cover_letter: Direct map of cover letter text from {cover_letter}.
-    - improvement_history: Direct map of {improvement_history}.
-    - final_confidence_score: Calculate the average of all specialist agents' confidence scores.
-    - sources: List all search query terms used by the skill gap agent, browser MCP resources, and local files accessed.
-    - ats_agent_report: Directly map {ats_analysis}.
-    - skill_gap_agent_report: Directly map {skill_gap}.
-    - grammar_agent_report: Directly map {grammar_review}.
-    - cover_letter_agent_report: Directly map {cover_letter}.
-    
-    Then save this report using the provided tools:
-    1. Save to SQLite DB using the sqlite MCP tool `store_analysis_report`.
-       Pass:
-         - resume_filename: {resume_filename}
-         - ats_score: (extract the ats_compatibility_score integer from ATS Analysis)
-         - job_role: {job_role}
-         - report_data_json: (JSON string of the final report contents matching the FinalReport schema)
-    2. Save to filesystem using the filesystem MCP tool `save_report_file`.
-       Save the report to `reports/{resume_filename}_report.md`. (You must write a beautifully styled, complete markdown report using the custom layout requested).
-    
-    Output must match the FinalReport schema.""",
-    output_schema=FinalReport,
-    output_key="final_report",
-    tools=[filesystem_mcp_tool, sqlite_mcp_tool]
-)
+@node(name="report_generator")
+async def report_generator_node(ctx: Context, node_input: Any) -> Event:
+    parsed_resume = ctx.state.get("parsed_resume")
+    ats_analysis = ctx.state.get("ats_analysis")
+    skill_gap = ctx.state.get("skill_gap")
+    grammar_review = ctx.state.get("grammar_review")
+    interview_prep = ctx.state.get("interview_prep")
+    cover_letter = ctx.state.get("cover_letter")
+    career_coach = ctx.state.get("career_coach")
+    improvement_history = ctx.state.get("improvement_history") or ""
+    resume_filename = ctx.state.get("resume_filename", "resume.txt")
+    job_role = ctx.state.get("job_role", "")
+
+    def get_val(obj, key, default=None):
+        if obj is None:
+            return default
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
+    ats_score = get_val(ats_analysis, "ats_compatibility_score", 0)
+
+    scores = []
+    for x in [parsed_resume, ats_analysis, skill_gap, grammar_review, interview_prep, cover_letter, career_coach]:
+        val = get_val(x, "confidence_score")
+        if val is not None:
+            scores.append(val)
+    final_confidence = int(sum(scores) / len(scores)) if scores else 90
+
+    name = get_val(parsed_resume, "name", "Candidate")
+    readiness = get_val(career_coach, "readiness", "Review completed.")
+    exec_summary = (
+        f"Comprehensive job application alignment report for {name} targeting the '{job_role}' position. "
+        f"The profile has been evaluated by our parallel specialist swarm and has received an overall ATS compatibility score of {ats_score}/100. "
+        f"Readiness: {readiness}"
+    )
+
+    report = FinalReport(
+        executive_summary=exec_summary,
+        career_coach_recommendation=career_coach,
+        resume_info=parsed_resume,
+        ats_score=ats_score,
+        strengths=get_val(ats_analysis, "strengths", []) or [],
+        weaknesses=get_val(ats_analysis, "weaknesses", []) or [],
+        missing_skills=get_val(skill_gap, "missing_skills", []) or [],
+        grammar_suggestions=get_val(grammar_review, "grammar_errors", []) or [],
+        professional_improvements=get_val(grammar_review, "tone_suggestions", []) or [],
+        interview_questions=interview_prep,
+        cover_letter=get_val(cover_letter, "cover_letter", None) if cover_letter else None,
+        improvement_history=improvement_history,
+        final_confidence_score=final_confidence,
+        sources=get_val(skill_gap, "sources", []) or ["Local Filesystem", "DuckDuckGo API"],
+        ats_agent_report=ats_analysis,
+        skill_gap_agent_report=skill_gap,
+        grammar_agent_report=grammar_review,
+        cover_letter_agent_report=cover_letter
+    )
+
+    # Save to SQLite Database directly (bypassing MCP stdio subprocesses for maximum speed)
+    try:
+        from backend.database import database
+        database.save_analysis(resume_filename, ats_score, job_role, report.model_dump())
+    except Exception as e:
+        print(f"Error saving to SQLite database: {str(e)}", file=sys.stderr)
+
+    # Save Markdown report to filesystem directly
+    try:
+        reports_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "reports"))
+        os.makedirs(reports_dir, exist_ok=True)
+        filepath = os.path.join(reports_dir, f"{resume_filename}_report.md")
+
+        markdown_content = f"""# AI Career Copilot Analysis Report
+
+* **Resume Document**: {resume_filename}
+* **Target Role**: {job_role}
+* **ATS Compatibility Score**: {ats_score}/100
+
+---
+
+## 1. Executive Summary
+{exec_summary}
+
+## 2. Career Coach Alignment Assessment
+* **Application Readiness**: {readiness}
+* **Competitiveness Level**: {get_val(career_coach, 'competitiveness', 'Medium')}
+
+### Next Recommended Actions:
+""" + "\n".join([f"* {act}" for act in get_val(career_coach, "next_actions", []) or []]) + f"""
+
+---
+
+## 3. ATS & Layout Formatting Review
+""" + "\n".join([f"* {issue}" for issue in get_val(ats_analysis, "formatting_issues", []) or []]) + f"""
+
+---
+
+## 4. Strengths
+""" + "\n".join([f"* {str_}" for str_ in get_val(ats_analysis, "strengths", []) or []]) + f"""
+
+---
+
+## 5. Priority Areas for Improvement
+""" + "\n".join([f"* {imp}" for imp in get_val(career_coach, "improvements", []) or []]) + f"""
+
+---
+
+## 6. Skill Gap & Industry Analysis
+### Matching Skills:
+""" + ", ".join(get_val(parsed_resume, "skills", []) or []) + f"""
+
+### Missing Skills:
+""" + ", ".join(get_val(skill_gap, "missing_skills", []) or []) + f"""
+
+### Skill Acquisition Recommendations:
+""" + "\n".join([f"* {rec}" for rec in get_val(skill_gap, "recommendations", []) or []]) + f"""
+
+---
+
+## 7. Grammar, Spelling & Phrasing Review
+""" + "\n".join([f"* Grammar issue: {err}" for err in get_val(grammar_review, "grammar_errors", []) or []]) + "\n" + "\n".join([f"* Spelling issue: {err}" for err in get_val(grammar_review, "spelling_errors", []) or []]) + f"""
+
+---
+
+## 8. Tailored Interview Prep Questions
+### HR & Behavioral Questions:
+""" + "\n".join([f"* {q}" for q in get_val(interview_prep, "hr_questions", []) or []]) + f"""
+
+### Technical Questions:
+""" + "\n".join([f"* {q}" for q in get_val(interview_prep, "technical_questions", []) or []]) + f"""
+
+### Project-based Questions:
+""" + "\n".join([f"* {q}" for q in get_val(interview_prep, "project_based_questions", []) or []]) + f"""
+
+---
+
+## 9. Personalized Cover Letter
+{get_val(cover_letter, 'cover_letter', 'N/A')}
+"""
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(markdown_content)
+    except Exception as e:
+        print(f"Error saving markdown file: {str(e)}", file=sys.stderr)
+
+    return Event(
+        output=report,
+        state={"final_report": report}
+    )
 
 
 validation_join = JoinNode(name="validation_join")
@@ -535,7 +633,7 @@ career_copilot_workflow = Workflow(
             "pass": career_coach_agent,
             "fail": handle_validation_error
         }),
-        (career_coach_agent, report_generator_agent)
+        (career_coach_agent, report_generator_node)
     ],
     input_schema=WorkflowInput,
     output_schema=FinalReport

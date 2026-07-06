@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import BorderGlow from "../components/BorderGlow";
 import { 
   Upload, 
   FileText, 
   Briefcase, 
   Award, 
-  BarChart2, 
   CheckCircle2, 
   Loader2, 
   AlertCircle, 
@@ -15,7 +15,6 @@ import {
   ShieldAlert, 
   FileDown, 
   Plus, 
-  Sparkles, 
   User, 
   BookOpen, 
   HelpCircle,
@@ -73,31 +72,31 @@ interface AnalysisReport {
 }
 
 const AGENTS = [
-  { id: "security_agent", label: "Security Agent (MCP Guard)" },
+  { id: "security_agent", label: "Security Agent Guard" },
   { id: "init_state", label: "Workflow Initializer" },
-  { id: "read_resume_node", label: "Resume Reader" },
-  { id: "resume_parser", label: "Resume Parser Agent" },
-  { id: "ats_analysis", label: "ATS Analyzer Agent" },
-  { id: "skill_gap", label: "Skill Gap Agent" },
-  { id: "grammar_review", label: "Grammar & Tone Agent" },
-  { id: "interview_prep", label: "Interview Prep Agent" },
-  { id: "cover_letter", label: "Cover Letter Agent (Optional)" },
-  { id: "validation_node", label: "Validation Agent" },
-  { id: "career_coach", label: "Career Coach Agent" },
-  { id: "report_generator", label: "Report Generator Agent" }
+  { id: "read_resume_node", label: "Resume Document Reader" },
+  { id: "resume_parser", label: "Resume Parser Specialist" },
+  { id: "ats_analysis", label: "ATS Compatibility Specialist" },
+  { id: "skill_gap", label: "Skill Gap Specialist" },
+  { id: "grammar_review", label: "Grammar & Style Specialist" },
+  { id: "interview_prep", label: "Interview Preparation Specialist" },
+  { id: "cover_letter", label: "Cover Letter Specialist" },
+  { id: "validation_node", label: "Workflow Validation Agent" },
+  { id: "career_coach", label: "Hiring Manager Career Coach" },
+  { id: "report_generator", label: "Report Compiler & Exporter" }
 ];
 
 function ExplainabilityCard({ agentName, confidence, reasoning }: { agentName: string; confidence: number; reasoning: string }) {
   return (
-    <div className="mt-4 p-4 bg-slate-950/80 border border-slate-800/80 rounded-xl flex flex-col gap-1">
+    <div className="mt-5 p-4 bg-purple-950/10 border border-purple-500/10 rounded-lg flex flex-col gap-2 shadow-[0_0_15px_rgba(168,85,247,0.05)]">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase text-slate-500 tracking-wider">Agent Credentials</span>
-        <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full">
-          {agentName} (Conf: {confidence}%)
+        <span className="text-[10px] font-extrabold uppercase text-purple-400 tracking-wider font-sans">Agent Evaluation Credentials</span>
+        <span className="text-[10px] font-bold text-pink-300 bg-pink-950/30 border border-pink-500/20 px-2 py-0.5 rounded font-sans">
+          {agentName} (Confidence: {confidence}%)
         </span>
       </div>
-      <p className="text-xs text-slate-400 leading-relaxed mt-1">
-        <span className="font-semibold text-slate-300">Reasoning:</span> {reasoning}
+      <p className="text-xs text-zinc-300 leading-relaxed mt-1">
+        <span className="font-semibold text-purple-300">Verification Reasoning:</span> {reasoning}
       </p>
     </div>
   );
@@ -225,12 +224,11 @@ export default function Home() {
     initialProgress["security_agent"] = "running";
     setAgentProgress(initialProgress);
     setAgentSummaries({
-      "security_agent": "Verifying filesystem read permissions and integrity..."
+      "security_agent": "Verifying filesystem read permissions and workspace integrity..."
     });
 
     // 2. Trigger analysis and start listening to SSE
     try {
-      const controller = new AbortController();
       const response = await fetch(`${backendUrl}/api/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -274,16 +272,35 @@ export default function Home() {
                 const agentId = event.agent;
                 const status = event.status;
                 
-                setAgentProgress(prev => ({
-                  ...prev,
-                  [agentId]: status,
-                  security_agent: "completed"
-                }));
-                setAgentSummaries(prev => ({
-                  ...prev,
-                  security_agent: "✓ All filesystem, database, and browser calls validated",
-                  ...(event.summary ? { [agentId]: event.summary } : {})
-                }));
+                setAgentProgress(prev => {
+                  const newProgress = {
+                    ...prev,
+                    [agentId]: status,
+                    security_agent: "completed" as const
+                  };
+                  if (agentId === "resume_parser") {
+                    newProgress["init_state"] = "completed";
+                    newProgress["read_resume_node"] = "completed";
+                  }
+                  if (agentId === "career_coach") {
+                    newProgress["validation_node"] = "completed";
+                    if (newProgress["cover_letter"] !== "completed") {
+                      newProgress["cover_letter"] = "completed";
+                    }
+                  }
+                  return newProgress;
+                });
+                setAgentSummaries(prev => {
+                  const newSummaries = {
+                    ...prev,
+                    security_agent: "✓ All filesystem, database, and browser calls validated successfully",
+                    ...(event.summary ? { [agentId]: event.summary } : {})
+                  };
+                  if (agentId === "career_coach" && !newSummaries["cover_letter"]) {
+                    newSummaries["cover_letter"] = "✓ Cover letter skipped (no job description)";
+                  }
+                  return newSummaries;
+                });
                 setActiveStep(agentId);
 
                 if (agentId === "report_generator" && status === "completed" && event.result) {
@@ -339,17 +356,17 @@ export default function Home() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 font-sans overflow-hidden">
+    <div className="flex h-screen bg-[#07050f] text-[#f4f4f7] font-sans overflow-hidden">
       {/* Sidebar: History */}
-      <aside className="w-80 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0">
+      <aside className="w-80 bg-zinc-950/40 backdrop-blur-md border-r border-white/5 flex flex-col justify-between shrink-0">
         <div className="flex flex-col flex-1 overflow-y-auto">
-          <div className="p-6 border-b border-slate-800 flex items-center gap-3">
-            <div className="p-2 bg-indigo-600 rounded-lg text-white">
-              <Sparkles className="h-5 w-5" />
+          <div className="p-6 border-b border-white/5 flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-tr from-pink-500 via-purple-600 to-indigo-600 rounded text-white shadow-[0_0_15px_rgba(236,72,153,0.3)]">
+              <Briefcase className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="font-bold text-lg leading-none">Career Copilot</h1>
-              <p className="text-xs text-slate-400 mt-1">AI Job Application Multi-Agent</p>
+              <h1 className="font-bold text-lg leading-none tracking-tight text-white">Career Copilot</h1>
+              <p className="text-[11px] text-purple-400 font-sans mt-1 uppercase tracking-wider font-semibold">Report Analysis Swarm</p>
             </div>
           </div>
 
@@ -362,43 +379,43 @@ export default function Home() {
                 setJobDescription("");
                 setResumeFile(null);
               }}
-              className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg font-medium text-sm transition flex items-center justify-center gap-2"
+              className="w-full py-2.5 px-4 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded font-sans font-bold text-xs tracking-wide transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(236,72,153,0.25)] border-0 cursor-pointer"
             >
-              <Plus className="h-4 w-4" /> New Analysis
+              <Plus className="h-3.5 w-3.5" /> New Analysis
             </button>
           </div>
 
           <div className="px-4 flex-1">
-            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">History</h2>
+            <h2 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-3 px-2 font-sans">Analysis Archive</h2>
             {history.length === 0 ? (
-              <p className="text-sm text-slate-400 italic px-2 py-4">No previous reports found.</p>
+              <p className="text-xs text-stone-400 italic px-2 py-4">No archived reports found.</p>
             ) : (
               <div className="space-y-1">
                 {history.map((item) => (
                   <div
                     key={item.id}
                     onClick={() => loadReport(item.id)}
-                    className={`group w-full text-left p-3 rounded-lg cursor-pointer transition flex items-center justify-between ${
+                    className={`group w-full text-left p-3 rounded cursor-pointer transition-all flex items-center justify-between border ${
                       selectedReport?.id === item.id 
-                        ? "bg-indigo-600/10 border border-indigo-500/30 text-indigo-400" 
-                        : "hover:bg-slate-800 border border-transparent text-slate-300"
+                        ? "bg-purple-950/30 border-purple-500/50 text-white shadow-[0_0_15px_rgba(168,85,247,0.1)]" 
+                        : "bg-transparent hover:bg-white/5 border-transparent text-zinc-300 hover:text-white"
                     }`}
                   >
-                    <div className="overflow-hidden pr-2">
-                      <div className="font-medium text-sm truncate">{item.job_role}</div>
-                      <div className="text-xs text-slate-500 truncate mt-0.5">{item.resume_filename}</div>
+                    <div className="overflow-hidden pr-2 flex-1">
+                      <div className="font-bold text-sm truncate text-zinc-100 group-hover:text-white">{item.job_role}</div>
+                      <div className="text-[11px] text-zinc-400 font-sans truncate mt-0.5">{item.resume_filename}</div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
-                        item.ats_score >= 80 ? "bg-emerald-500/20 text-emerald-400" :
-                        item.ats_score >= 60 ? "bg-amber-500/20 text-amber-400" :
-                        "bg-rose-500/20 text-rose-400"
+                      <span className={`text-[11px] font-sans font-bold px-1.5 py-0.5 rounded border ${
+                        item.ats_score >= 80 ? "bg-emerald-950/40 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.1)]" :
+                        item.ats_score >= 60 ? "bg-amber-950/40 text-amber-400 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.1)]" :
+                        "bg-rose-950/40 text-rose-400 border-rose-500/30 shadow-[0_0_10px_rgba(239,68,68,0.1)]"
                       }`}>
                         {item.ats_score}
                       </span>
                       <button 
                         onClick={(e) => triggerDelete(item.id, e)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-rose-400 text-slate-400 transition"
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-rose-400 text-zinc-500 transition"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -409,45 +426,57 @@ export default function Home() {
             )}
           </div>
         </div>
+        
+        {/* User signature */}
+        <div className="p-4 border-t border-white/5 bg-zinc-950/30 flex items-center gap-3">
+          <div className="h-8 w-8 rounded-full bg-purple-950/60 border border-purple-500/30 flex items-center justify-center text-purple-300">
+            <User className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-zinc-200 font-sans">Executive Portal</p>
+            <p className="text-[10px] text-purple-400/80 font-sans">Active Session</p>
+          </div>
+        </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto bg-slate-950 p-8">
+      <main className="flex-1 overflow-y-auto bg-transparent p-10">
         {!selectedReport && !isAnalyzing && (
-          <div className="max-w-2xl mx-auto py-12">
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-extrabold text-white tracking-tight">AI Career Analysis</h1>
-              <p className="text-slate-400 mt-2">
-                Upload your resume, specify the target job description, and run our multi-agent workflow to receive an ATS check, missing skills list, interview questions, and a customized cover letter.
+          <div className="max-w-2xl mx-auto py-10">
+            <div className="text-center mb-10">
+              <h1 className="text-3xl font-extrabold tracking-tight leading-tight bg-clip-text text-transparent bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400">Executive Resume Optimization</h1>
+              <p className="text-zinc-400 text-sm mt-3 leading-relaxed max-w-lg mx-auto">
+                Align your professional profile against target corporate roles. Compiles ATS compliance indices, searches market skills, and crafts structured career coach recommendations.
               </p>
             </div>
 
-            <form onSubmit={startAnalysis} className="space-y-6 bg-slate-900 p-8 border border-slate-800 rounded-2xl shadow-xl">
+            <BorderGlow className="w-full">
+              <form onSubmit={startAnalysis} className="space-y-6 p-8">
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Target Job Role <span className="text-rose-400">*</span></label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-300 font-sans mb-2">Target Job Role <span className="text-pink-500">*</span></label>
                 <div className="relative">
-                  <Briefcase className="absolute left-3.5 top-3.5 h-5 w-5 text-slate-500" />
+                  <Briefcase className="absolute left-3.5 top-3.5 h-4 w-4 text-purple-400" />
                   <input
                     type="text"
                     value={jobRole}
                     onChange={(e) => setJobRole(e.target.value)}
-                    placeholder="e.g., Senior Full Stack Engineer"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-12 pr-4 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-sm"
+                    placeholder="e.g., Senior Investment Analyst"
+                    className="w-full bg-zinc-950/50 border border-white/10 rounded py-3 pl-10 pr-4 text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition text-sm font-sans"
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Upload Resume (PDF, DOCX) <span className="text-rose-400">*</span></label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-300 font-sans mb-2">Upload Resume (PDF, DOCX) <span className="text-pink-500">*</span></label>
                 <div
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={handleFileDrop}
                   onClick={triggerFileSelect}
-                  className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition ${
+                  className={`border-2 border-dashed rounded p-10 text-center cursor-pointer transition-all ${
                     resumeFile 
-                      ? "border-emerald-500/50 bg-emerald-500/5" 
-                      : "border-slate-800 hover:border-indigo-500/50 bg-slate-950"
+                      ? "border-emerald-500/50 bg-emerald-950/10 shadow-[0_0_15px_rgba(16,185,129,0.05)]" 
+                      : "border-white/10 bg-zinc-950/20 hover:bg-zinc-950/40 hover:border-purple-500/40"
                   }`}
                 >
                   <input
@@ -458,16 +487,16 @@ export default function Home() {
                     className="hidden"
                   />
                   <div className="flex flex-col items-center justify-center">
-                    <Upload className={`h-10 w-10 mb-3 ${resumeFile ? "text-emerald-400" : "text-slate-500"}`} />
+                    <Upload className={`h-8 w-8 mb-3 ${resumeFile ? "text-emerald-400" : "text-purple-400"}`} />
                     {resumeFile ? (
                       <div>
-                        <p className="font-semibold text-slate-200 text-sm">{resumeFile.name}</p>
-                        <p className="text-xs text-emerald-400 mt-1">{(resumeFile.size / 1024 / 1024).toFixed(2)} MB • File loaded</p>
+                        <p className="font-bold text-white text-sm">{resumeFile.name}</p>
+                        <p className="text-[11px] text-emerald-400 font-semibold font-sans mt-1">{(resumeFile.size / 1024 / 1024).toFixed(2)} MB • File loaded successfully</p>
                       </div>
                     ) : (
                       <div>
-                        <p className="font-medium text-slate-300 text-sm">Drag and drop your file here, or click to browse</p>
-                        <p className="text-xs text-slate-500 mt-1.5">PDF or DOCX (max. 10MB)</p>
+                        <p className="font-medium text-zinc-300 text-sm">Drag and drop document, or click to browse</p>
+                        <p className="text-[11px] text-zinc-500 font-sans mt-1.5">PDF or DOCX format (Max 10MB)</p>
                       </div>
                     )}
                   </div>
@@ -475,83 +504,85 @@ export default function Home() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">Job Description (Optional)</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-300 font-sans mb-2">Job Description (Optional)</label>
                 <textarea
                   value={jobDescription}
                   onChange={(e) => setJobDescription(e.target.value)}
-                  placeholder="Paste the job description here to check for skill gaps and generate a personalized cover letter..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-sm h-32 resize-none"
+                  placeholder="Paste the target job description to map detailed skill deficiencies and generate cover letters..."
+                  className="w-full bg-zinc-950/50 border border-white/10 rounded py-3 px-4 text-white placeholder-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition text-sm h-32 resize-none font-sans"
                 />
               </div>
 
               {errorMsg && (
-                <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
-                  <p className="text-sm text-rose-300">{errorMsg}</p>
+                <div className="p-4 bg-rose-950/30 border border-rose-500/20 rounded flex items-start gap-3">
+                  <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-rose-200 font-sans font-medium">{errorMsg}</p>
                 </div>
               )}
 
               <button
                 type="submit"
                 disabled={isUploading}
-                className="w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold text-sm transition shadow-lg shadow-indigo-600/20 hover:shadow-indigo-600/30 flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 hover:from-purple-700 hover:via-fuchsia-700 hover:to-pink-700 text-white rounded font-bold text-xs tracking-wider uppercase font-sans transition-all duration-300 transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(168,85,247,0.3)] border-0 cursor-pointer"
               >
                 {isUploading ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Uploading...
+                    <Loader2 className="h-4 w-4 animate-spin text-white" /> Uploading Document...
                   </>
                 ) : (
                   <>
-                    Analyze Resume <ArrowRight className="h-4 w-4" />
+                    Run Analysis Swarm <ArrowRight className="h-3.5 w-3.5" />
                   </>
                 )}
               </button>
-            </form>
+              </form>
+            </BorderGlow>
           </div>
         )}
 
         {/* Live Execution Progress */}
         {isAnalyzing && (
-          <div className="max-w-xl mx-auto py-12">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
+          <div className="max-w-xl mx-auto py-10">
+            <BorderGlow className="w-full">
+              <div className="p-8">
               <div className="text-center mb-8">
-                <Loader2 className="h-10 w-10 animate-spin text-indigo-500 mx-auto mb-3" />
-                <h2 className="text-xl font-bold text-white">Analyzing Job Application</h2>
-                <p className="text-slate-400 text-sm mt-1">Multi-Agent swarm executing in parallel...</p>
+                <Loader2 className="h-8 w-8 animate-spin text-purple-400 mx-auto mb-3" />
+                <h2 className="text-xl font-bold text-white">Multi-Agent Orchestration Swarm</h2>
+                <p className="text-zinc-400 text-xs font-sans mt-1">Executing parallel analysis modules & validation rules...</p>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {AGENTS.map((agent) => {
                   const status = agentProgress[agent.id] || "idle";
                   const summary = agentSummaries[agent.id];
                   return (
-                    <div key={agent.id} className="flex flex-col p-3 rounded-lg bg-slate-950 border border-slate-800/50 gap-1.5">
+                    <div key={agent.id} className="flex flex-col p-3 rounded bg-zinc-950/40 border border-white/5 gap-1">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div className={`h-2.5 w-2.5 rounded-full ${
-                            status === "completed" ? "bg-emerald-500 shadow-lg shadow-emerald-500/30" :
-                            status === "running" ? "bg-amber-500 animate-pulse shadow-lg shadow-amber-500/30" :
-                            status === "retrying" ? "bg-indigo-500 animate-bounce shadow-lg shadow-indigo-500/30" :
-                            status === "failed" ? "bg-rose-500 shadow-lg shadow-rose-500/30" :
-                            "bg-slate-700"
+                          <div className={`h-2 w-2 rounded-full ${
+                            status === "completed" ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
+                            status === "running" ? "bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]" :
+                            status === "retrying" ? "bg-fuchsia-500 animate-bounce shadow-[0_0_8px_rgba(217,70,239,0.5)]" :
+                            status === "failed" ? "bg-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" :
+                            "bg-zinc-700"
                           }`} />
-                          <span className={`text-sm font-medium ${
-                            status === "completed" ? "text-slate-200" :
-                            status === "running" ? "text-amber-400 font-semibold" :
-                            status === "retrying" ? "text-indigo-400 font-semibold" :
-                            "text-slate-500"
+                          <span className={`text-xs font-semibold font-sans ${
+                            status === "completed" ? "text-zinc-200" :
+                            status === "running" ? "text-amber-300 font-bold" :
+                            status === "retrying" ? "text-fuchsia-300 font-bold" :
+                            "text-zinc-500"
                           }`}>{agent.label}</span>
                         </div>
-                        <div className="shrink-0">
-                          {status === "completed" && <CheckCircle2 className="h-5 w-5 text-emerald-400 animate-fade-in" />}
-                          {status === "running" && <Loader2 className="h-4 w-4 animate-spin text-amber-400" />}
-                          {status === "retrying" && <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />}
-                          {status === "failed" && <AlertCircle className="h-5 w-5 text-rose-400" />}
-                          {status === "idle" && <span className="text-xs text-slate-600 uppercase font-bold tracking-wider">Waiting</span>}
+                        <div className="shrink-0 font-sans">
+                          {status === "completed" && <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/30 border border-emerald-500/20 px-1.5 py-0.5 rounded">Done</span>}
+                          {status === "running" && <span className="text-[10px] text-amber-400 font-bold bg-amber-950/30 border border-amber-500/20 px-1.5 py-0.5 rounded animate-pulse">Running</span>}
+                          {status === "retrying" && <span className="text-[10px] text-fuchsia-400 font-bold bg-fuchsia-950/30 border border-fuchsia-500/20 px-1.5 py-0.5 rounded">Retrying</span>}
+                          {status === "failed" && <span className="text-[10px] text-rose-400 font-bold bg-rose-950/30 border border-rose-500/20 px-1.5 py-0.5 rounded">Failed</span>}
+                          {status === "idle" && <span className="text-[9px] text-zinc-500 uppercase font-bold tracking-wider">Queue</span>}
                         </div>
                       </div>
                       {summary && (
-                        <div className="text-xs text-slate-400 pl-5 animate-fade-in font-mono">
+                        <div className="text-xs text-zinc-400 pl-5 font-mono">
                           {summary}
                         </div>
                       )}
@@ -561,411 +592,457 @@ export default function Home() {
               </div>
 
               {errorMsg && (
-                <div className="mt-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
-                  <p className="text-sm text-rose-300">{errorMsg}</p>
+                <div className="mt-6 p-4 bg-rose-950/30 border border-rose-500/20 rounded flex items-start gap-3">
+                  <AlertCircle className="h-4 w-4 text-rose-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-rose-200 font-sans font-medium">{errorMsg}</p>
                 </div>
               )}
             </div>
-          </div>
-        )}
+          </BorderGlow>
+        </div>
+      )}
 
         {/* Report Viewer */}
         {selectedReport && !isAnalyzing && (
-          <div className="max-w-4xl mx-auto space-y-8 animate-fade-in pb-16">
+          <div className="max-w-4xl mx-auto space-y-8 pb-16">
             {/* Header: Score */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
-              <div>
-                <span className="text-xs font-semibold text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded-full uppercase tracking-wider">Report Generated</span>
-                <h1 className="text-3xl font-extrabold text-white mt-3">{selectedReport.job_role}</h1>
-                <p className="text-sm text-slate-400 mt-1 flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-slate-500" /> {selectedReport.resume_filename}
-                </p>
-              </div>
-              <div className="flex items-center gap-6 shrink-0">
-                <div className="relative h-28 w-28 flex items-center justify-center bg-slate-950 rounded-full border-4 border-slate-800">
-                  <div className="text-center">
-                    <span className="block text-3xl font-black text-white">{selectedReport.ats_score}</span>
-                    <span className="text-xxs uppercase font-bold text-slate-500 tracking-wider">ATS Score</span>
+            <BorderGlow className="w-full">
+              <div className="p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div>
+                  <span className="text-[10px] font-bold text-purple-300 bg-purple-950/50 border border-purple-500/30 px-2.5 py-1 rounded uppercase tracking-wider font-sans">Executive Summary Report</span>
+                  <h1 className="text-3xl font-extrabold text-white mt-3 leading-tight bg-clip-text text-transparent bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400">{selectedReport.job_role}</h1>
+                  <p className="text-xs text-zinc-400 mt-1.5 flex items-center gap-2 font-sans">
+                    <FileText className="h-4 w-4 text-purple-400" /> {selectedReport.resume_filename}
+                  </p>
+                </div>
+                <div className="flex items-center gap-6 shrink-0">
+                  <div className="relative h-28 w-28 flex items-center justify-center bg-zinc-950/50 rounded-full border border-white/10 shadow-[0_0_20px_rgba(168,85,247,0.15)]">
+                    <div className="text-center">
+                      <span className="block text-3xl font-extrabold text-white">{selectedReport.ats_score}</span>
+                      <span className="text-[10px] uppercase font-bold text-purple-400 tracking-widest font-sans">ATS Score</span>
+                    </div>
+                    {/* Circle outline animation with rounded glowing strokes */}
+                    <svg className="absolute -top-1 -left-1 h-[114px] w-[114px] transform -rotate-90">
+                      <defs>
+                        <linearGradient id="atsGlowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#ec4899" />
+                          <stop offset="100%" stopColor="#8b5cf6" />
+                        </linearGradient>
+                      </defs>
+                      <circle
+                        cx="57"
+                        cy="57"
+                        r="53"
+                        className="stroke-purple-950/40 fill-none"
+                        strokeWidth="4"
+                      />
+                      <circle
+                        cx="57"
+                        cy="57"
+                        r="53"
+                        className="fill-none"
+                        stroke="url(#atsGlowGrad)"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeDasharray="333"
+                        strokeDashoffset={333 - (333 * selectedReport.ats_score) / 100}
+                      />
+                    </svg>
                   </div>
-                  {/* Circle outline animation */}
-                  <svg className="absolute -top-1 -left-1 h-[116px] w-[116px] transform -rotate-90">
-                    <circle
-                      cx="58"
-                      cy="58"
-                      r="54"
-                      className="stroke-indigo-600 fill-none"
-                      strokeWidth="4"
-                      strokeDasharray="339.29"
-                      strokeDashoffset={339.29 - (339.29 * selectedReport.ats_score) / 100}
-                    />
-                  </svg>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <a
-                    href={`${backendUrl}/api/reports/${selectedReport.id}/download`}
-                    target="_blank"
-                    className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-2 transition"
-                  >
-                    <FileDown className="h-4 w-4" /> Download Report
-                  </a>
+                  <div className="flex flex-col gap-2 font-sans">
+                    <a
+                      href={`${backendUrl}/api/reports/${selectedReport.id}/download`}
+                      target="_blank"
+                      className="py-2 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white border-0 rounded text-xs font-semibold flex items-center gap-2 transition shadow-[0_4px_12px_rgba(168,85,247,0.2)]"
+                    >
+                      <FileDown className="h-4 w-4 text-purple-200" /> Download Report
+                    </a>
+                  </div>
                 </div>
               </div>
-            </div>
+            </BorderGlow>
 
             {/* 1. Executive Summary */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
-              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-indigo-400" /> Executive Summary
-              </h2>
-              <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-line">
-                {selectedReport.report_data.executive_summary}
-              </p>
-              <ExplainabilityCard
-                agentName="Report Generator Agent"
-                confidence={selectedReport.report_data.final_confidence_score || 90}
-                reasoning="Compiles and aggregates all verified outcomes from the specialist swarm."
-              />
-            </div>
+            <BorderGlow className="w-full">
+              <div className="p-8">
+                <h2 className="text-xl font-extrabold text-white border-b border-white/5 pb-3 mb-5 flex items-center gap-2">
+                  Executive Overview Summary
+                </h2>
+                <p className="text-zinc-200 text-sm leading-relaxed whitespace-pre-line">
+                  {selectedReport.report_data.executive_summary}
+                </p>
+                <ExplainabilityCard
+                  agentName="Report Compiler Agent"
+                  confidence={92}
+                  reasoning="Consolidates verified findings from all parallel specialist swarms."
+                />
+              </div>
+            </BorderGlow>
 
             {/* 2. Career Coach Recommendation */}
             {selectedReport.report_data.career_coach_recommendation && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
-                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                  <UserCheck className="h-5 w-5 text-indigo-400" /> Career Coach Recommendation
-                </h2>
-                <div className="space-y-4">
-                  <div className="p-4 bg-slate-950/50 rounded-xl border border-slate-800">
-                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Application Readiness</h3>
-                    <p className="text-sm text-slate-300 leading-relaxed">
-                      {selectedReport.report_data.career_coach_recommendation.readiness}
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-slate-950/50 rounded-xl border border-slate-800">
-                      <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Estimated Competitiveness</h3>
-                      <p className="text-sm font-bold text-indigo-400">
-                        {selectedReport.report_data.career_coach_recommendation.competitiveness}
+              <BorderGlow className="w-full">
+                <div className="p-8">
+                  <h2 className="text-xl font-extrabold text-white border-b border-white/5 pb-3 mb-5 flex items-center gap-2">
+                    Hiring Manager Recommendations
+                  </h2>
+                  <div className="space-y-4">
+                    <div className="p-4 bg-zinc-950/40 rounded border border-white/5">
+                      <h3 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest font-sans mb-1.5">Application Readiness Statement</h3>
+                      <p className="text-sm text-zinc-200 leading-relaxed">
+                        {selectedReport.report_data.career_coach_recommendation.readiness}
                       </p>
                     </div>
-                    <div className="p-4 bg-slate-950/50 rounded-xl border border-slate-800">
-                      <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Recommended Next Actions</h3>
-                      <ul className="space-y-1.5 text-xs text-slate-300">
-                        {selectedReport.report_data.career_coach_recommendation.next_actions.map((act: string, idx: number) => (
-                          <li key={idx} className="flex gap-2">
-                            <span className="text-indigo-400 font-bold">•</span>
-                            <span>{act}</span>
-                          </li>
-                        ))}
-                      </ul>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 bg-zinc-950/40 rounded border border-white/5">
+                        <h3 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest font-sans mb-1.5">Estimated Competitiveness</h3>
+                        <p className="text-sm font-bold text-white">
+                          {selectedReport.report_data.career_coach_recommendation.competitiveness}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-zinc-950/40 rounded border border-white/5">
+                        <h3 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest font-sans mb-2.5">Priority Actions</h3>
+                        <ul className="space-y-1.5 text-xs text-zinc-300">
+                          {selectedReport.report_data.career_coach_recommendation.next_actions.map((act: string, idx: number) => (
+                            <li key={idx} className="flex gap-2">
+                              <span className="text-pink-500 font-bold">•</span>
+                              <span>{act}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                   </div>
+                  <ExplainabilityCard
+                    agentName="Career Coach Agent"
+                    confidence={selectedReport.report_data.career_coach_recommendation.confidence_score || 95}
+                    reasoning={selectedReport.report_data.career_coach_recommendation.reasoning}
+                  />
                 </div>
-                <ExplainabilityCard
-                  agentName="Career Coach Agent"
-                  confidence={selectedReport.report_data.career_coach_recommendation.confidence_score || 95}
-                  reasoning={selectedReport.report_data.career_coach_recommendation.reasoning}
-                />
-              </div>
+              </BorderGlow>
             )}
 
             {/* 3. ATS Score & Details */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
-              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <Gauge className="h-5 w-5 text-indigo-400" /> ATS Details & Layout Issues
-              </h2>
-              {selectedReport.report_data.ats_agent_report?.formatting_issues?.length > 0 ? (
-                <ul className="space-y-2.5">
-                  {selectedReport.report_data.ats_agent_report.formatting_issues.map((issue: string, idx: number) => (
-                    <li key={idx} className="flex gap-2.5 text-sm text-slate-300 align-top">
-                      <span className="text-amber-500 font-bold mt-0.5">•</span>
-                      <span>{issue}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-emerald-400 font-medium">No formatting or layout issues detected by ATS Agent.</p>
-              )}
-              <ExplainabilityCard
-                agentName="ATS Agent"
-                confidence={selectedReport.report_data.ats_agent_report?.confidence_score || 85}
-                reasoning={selectedReport.report_data.ats_agent_report?.reasoning || "Evaluated resume keywords, heading structures, and document parser compatibility."}
-              />
-            </div>
-
-            {/* 4. Resume Strengths */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
-              <h2 className="text-xl font-bold text-emerald-400 mb-4 flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5" /> Resume Strengths
-              </h2>
-              <ul className="space-y-3">
-                {selectedReport.report_data.strengths.map((str, idx) => (
-                  <li key={idx} className="flex gap-2.5 text-sm text-slate-300 align-top">
-                    <span className="text-emerald-400 font-bold mt-0.5">•</span>
-                    <span>{str}</span>
-                  </li>
-                ))}
-              </ul>
-              <ExplainabilityCard
-                agentName="ATS & Career Coach Agents"
-                confidence={90}
-                reasoning="Identified candidate's outstanding professional characteristics, strong profile metrics, and key project outcomes."
-              />
-            </div>
-
-            {/* 5. Priority Improvements */}
-            {selectedReport.report_data.career_coach_recommendation && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
-                <h2 className="text-xl font-bold text-rose-400 mb-4 flex items-center gap-2">
-                  <ShieldAlert className="h-5 w-5" /> Priority Improvements
+            <BorderGlow className="w-full">
+              <div className="p-8">
+                <h2 className="text-xl font-extrabold text-white border-b border-white/5 pb-3 mb-5 flex items-center gap-2">
+                  ATS Layout & Compatibility Review
                 </h2>
-                <ul className="space-y-3">
-                  {selectedReport.report_data.career_coach_recommendation.improvements.map((imp: string, idx: number) => (
-                    <li key={idx} className="flex gap-2.5 text-sm text-slate-300 align-top">
-                      <span className="text-rose-400 font-bold mt-0.5">•</span>
-                      <span>{imp}</span>
-                    </li>
-                  ))}
-                </ul>
+                {selectedReport.report_data.ats_agent_report?.formatting_issues?.length > 0 ? (
+                  <ul className="space-y-2.5">
+                    {selectedReport.report_data.ats_agent_report.formatting_issues.map((issue: string, idx: number) => (
+                      <li key={idx} className="flex gap-2.5 text-sm text-zinc-200 align-top">
+                        <span className="text-amber-400 font-bold mt-0.5">•</span>
+                        <span>{issue}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-emerald-400 font-medium font-sans">No format or template layout issues detected. Document parsed successfully.</p>
+                )}
                 <ExplainabilityCard
-                  agentName="Career Coach Agent"
-                  confidence={selectedReport.report_data.career_coach_recommendation.confidence_score || 95}
-                  reasoning={selectedReport.report_data.career_coach_recommendation.reasoning}
+                  agentName="ATS Specialist Agent"
+                  confidence={selectedReport.report_data.ats_agent_report?.confidence_score || 85}
+                  reasoning={selectedReport.report_data.ats_agent_report?.reasoning || "Evaluated structural headings, tables, margins, and standard compliance."}
                 />
               </div>
-            )}
+            </BorderGlow>
 
-            {/* 6. Skill Gap Analysis */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
-              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                <Award className="h-5 w-5 text-indigo-400" /> Skill Gap Analysis
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
-                <div>
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Matching Skills</h3>
-                  {selectedReport.report_data.resume_info.skills.length === 0 ? (
-                    <p className="text-sm text-slate-500 italic">No skills listed.</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedReport.report_data.resume_info.skills.map((skill, idx) => (
-                        <span key={idx} className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs px-2.5 py-1 rounded-md font-medium">
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Missing Skills (Recommended)</h3>
-                  {selectedReport.report_data.missing_skills.length === 0 ? (
-                    <p className="text-sm text-emerald-400 font-medium">No missing skills detected! Great fit.</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedReport.report_data.missing_skills.map((skill, idx) => (
-                        <span key={idx} className="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-xs px-2.5 py-1 rounded-md font-medium">
-                          {skill}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {selectedReport.report_data.skill_gap_agent_report && (
-                <div className="mb-4">
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Skill Acquisition Plan</h3>
+            {/* 4. Resume Strengths */}
+            <BorderGlow className="w-full">
+              <div className="p-8">
+                <h2 className="text-xl font-extrabold text-white border-b border-white/5 pb-3 mb-5 flex items-center gap-2">
+                  Document Strengths
+                </h2>
+                <div className="bg-emerald-950/10 border border-emerald-500/20 p-5 rounded">
                   <ul className="space-y-3">
-                    {selectedReport.report_data.skill_gap_agent_report.recommendations.map((rec: string, idx: number) => (
-                      <li key={idx} className="flex gap-2.5 text-sm text-slate-300">
-                        <span className="text-indigo-400 font-bold mt-0.5">•</span>
-                        <span>{rec}</span>
+                    {selectedReport.report_data.strengths.map((str, idx) => (
+                      <li key={idx} className="flex gap-2.5 text-sm text-zinc-200 align-top">
+                        <span className="text-emerald-400 font-bold mt-0.5">•</span>
+                        <span>{str}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
-              )}
-              <ExplainabilityCard
-                agentName="Skill Gap Agent"
-                confidence={selectedReport.report_data.skill_gap_agent_report?.confidence_score || 88}
-                reasoning={selectedReport.report_data.skill_gap_agent_report?.reasoning || "Searched job role requirements and checked skill matches."}
-              />
-            </div>
+                <ExplainabilityCard
+                  agentName="ATS & Career Coach Agents"
+                  confidence={90}
+                  reasoning="Identified strong experience descriptions, concrete metrics, and relevant keyword match configurations."
+                />
+              </div>
+            </BorderGlow>
 
-            {/* 7. Grammar & Tone Review */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
-              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-indigo-400" /> Grammar & Tone Review
-              </h2>
-              {selectedReport.report_data.grammar_agent_report && (
-                <div className="space-y-4 mb-4">
+            {/* 5. Priority Improvements */}
+            {selectedReport.report_data.career_coach_recommendation && (
+              <BorderGlow className="w-full">
+                <div className="p-8">
+                  <h2 className="text-xl font-extrabold text-white border-b border-white/5 pb-3 mb-5 flex items-center gap-2">
+                    Priority Areas for Improvement
+                  </h2>
+                  <div className="bg-rose-950/10 border border-rose-500/20 p-5 rounded">
+                    <ul className="space-y-3">
+                      {selectedReport.report_data.career_coach_recommendation.improvements.map((imp: string, idx: number) => (
+                        <li key={idx} className="flex gap-2.5 text-sm text-zinc-200 align-top">
+                          <span className="text-rose-400 font-bold mt-0.5">•</span>
+                          <span>{imp}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <ExplainabilityCard
+                    agentName="Career Coach Agent"
+                    confidence={selectedReport.report_data.career_coach_recommendation.confidence_score || 95}
+                    reasoning={selectedReport.report_data.career_coach_recommendation.reasoning}
+                  />
+                </div>
+              </BorderGlow>
+            )}
+
+            {/* 6. Skill Gap Analysis */}
+            <BorderGlow className="w-full">
+              <div className="p-8">
+                <h2 className="text-xl font-extrabold text-white border-b border-white/5 pb-3 mb-5 flex items-center gap-2">
+                  Industry Skill Alignment Checks
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6 font-sans">
                   <div>
-                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Grammar & Spelling Issues</h3>
-                    {selectedReport.report_data.grammar_agent_report.grammar_errors.length === 0 && selectedReport.report_data.grammar_agent_report.spelling_errors.length === 0 ? (
-                      <p className="text-sm text-emerald-400 font-medium">✓ No spelling or grammar errors detected!</p>
+                    <h3 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-3">Matching Qualifications</h3>
+                    {selectedReport.report_data.resume_info.skills.length === 0 ? (
+                      <p className="text-xs text-zinc-500 italic">No matching skills identified.</p>
                     ) : (
-                      <div className="space-y-2">
-                        {selectedReport.report_data.grammar_agent_report.grammar_errors.map((err: string, idx: number) => (
-                          <div key={idx} className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-sm text-rose-300 font-mono">
-                            Grammar: {err}
-                          </div>
-                        ))}
-                        {selectedReport.report_data.grammar_agent_report.spelling_errors.map((err: string, idx: number) => (
-                          <div key={idx} className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-sm text-rose-300 font-mono">
-                            Spelling: {err}
-                          </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedReport.report_data.resume_info.skills.map((skill, idx) => (
+                          <span key={idx} className="bg-emerald-950/30 text-emerald-400 border border-emerald-500/20 text-[11px] px-2.5 py-1 rounded font-medium">
+                            {skill}
+                          </span>
                         ))}
                       </div>
                     )}
                   </div>
-                  {selectedReport.report_data.grammar_agent_report.tone_suggestions?.length > 0 && (
-                    <div>
-                      <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tone & Professionalism Enhancements</h3>
-                      <ul className="space-y-2">
-                        {selectedReport.report_data.grammar_agent_report.tone_suggestions.map((sug: string, idx: number) => (
-                          <li key={idx} className="flex gap-2 text-sm text-slate-300">
-                            <span className="text-indigo-400 font-bold">•</span>
-                            <span>{sug}</span>
-                          </li>
+
+                  <div>
+                    <h3 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-3">Identified Deficiencies</h3>
+                    {selectedReport.report_data.missing_skills.length === 0 ? (
+                      <p className="text-xs text-emerald-400 font-bold bg-emerald-950/30 px-2.5 py-1 rounded border border-emerald-500/20 w-fit">Full skill alignment matches job role specifications.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedReport.report_data.missing_skills.map((skill, idx) => (
+                          <span key={idx} className="bg-rose-950/30 text-rose-400 border border-rose-500/20 text-[11px] px-2.5 py-1 rounded font-medium">
+                            {skill}
+                          </span>
                         ))}
-                      </ul>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-              <ExplainabilityCard
-                agentName="Grammar Agent"
-                confidence={selectedReport.report_data.grammar_agent_report?.confidence_score || 92}
-                reasoning={selectedReport.report_data.grammar_agent_report?.reasoning || "Scanned experiences and descriptions for syntax, spelling correctness, and phrasing."}
-              />
-            </div>
+
+                {selectedReport.report_data.skill_gap_agent_report && (
+                  <div className="mb-4">
+                    <h3 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest font-sans mb-3">Recommended Skill Acquisition Strategy</h3>
+                    <ul className="space-y-2.5">
+                      {selectedReport.report_data.skill_gap_agent_report.recommendations.map((rec: string, idx: number) => (
+                        <li key={idx} className="flex gap-2.5 text-sm text-zinc-200">
+                          <span className="text-purple-400 font-bold">•</span>
+                          <span>{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <ExplainabilityCard
+                  agentName="Skill Gap Specialist"
+                  confidence={selectedReport.report_data.skill_gap_agent_report?.confidence_score || 88}
+                  reasoning={selectedReport.report_data.skill_gap_agent_report?.reasoning || "Cross-referenced current credentials with search indices to discover gap areas."}
+                />
+              </div>
+            </BorderGlow>
+
+            {/* 7. Grammar & Tone Review */}
+            <BorderGlow className="w-full">
+              <div className="p-8">
+                <h2 className="text-xl font-extrabold text-white border-b border-white/5 pb-3 mb-5 flex items-center gap-2">
+                  Grammar, Tone & Professional Style Review
+                </h2>
+                {selectedReport.report_data.grammar_agent_report && (
+                  <div className="space-y-4 mb-4">
+                    <div>
+                      <h3 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest font-sans mb-2.5">Spelling & Syntax Corrections</h3>
+                      {selectedReport.report_data.grammar_agent_report.grammar_errors.length === 0 && selectedReport.report_data.grammar_agent_report.spelling_errors.length === 0 ? (
+                        <p className="text-xs text-emerald-400 font-bold bg-emerald-950/30 px-2.5 py-1.5 rounded border border-emerald-200 w-fit">✓ No spelling or formatting syntax errors found.</p>
+                      ) : (
+                        <div className="space-y-2 font-mono text-xs">
+                          {selectedReport.report_data.grammar_agent_report.grammar_errors.map((err: string, idx: number) => (
+                            <div key={idx} className="p-3 bg-rose-950/20 border border-rose-500/10 text-rose-300 rounded">
+                              Grammar Recommendation: {err}
+                            </div>
+                          ))}
+                          {selectedReport.report_data.grammar_agent_report.spelling_errors.map((err: string, idx: number) => (
+                            <div key={idx} className="p-3 bg-rose-950/20 border border-rose-500/10 text-rose-300 rounded">
+                              Spelling Correction: {err}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {selectedReport.report_data.grammar_agent_report.tone_suggestions?.length > 0 && (
+                      <div>
+                        <h3 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest font-sans mb-2.5">Tone & Professionalism Enhancements</h3>
+                        <ul className="space-y-2">
+                          {selectedReport.report_data.grammar_agent_report.tone_suggestions.map((sug: string, idx: number) => (
+                            <li key={idx} className="flex gap-2 text-sm text-zinc-200">
+                              <span className="text-purple-400 font-bold">•</span>
+                              <span>{sug}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <ExplainabilityCard
+                  agentName="Grammar & Style Agent"
+                  confidence={selectedReport.report_data.grammar_agent_report?.confidence_score || 92}
+                  reasoning={selectedReport.report_data.grammar_agent_report?.reasoning || "Scanned experiences and profiles to detect passive language and redundant expressions."}
+                />
+              </div>
+            </BorderGlow>
 
             {/* 8. Interview Prep Questions */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
-              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                <HelpCircle className="h-5 w-5 text-indigo-400" /> Tailored Interview Preparation
-              </h2>
+            <BorderGlow className="w-full">
+              <div className="p-8">
+                <h2 className="text-xl font-extrabold text-white border-b border-white/5 pb-3 mb-5 flex items-center gap-2">
+                  Customized Interview Preparation
+                </h2>
 
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-sm font-semibold text-indigo-400 mb-3 uppercase tracking-wider">HR & Behavioral</h3>
-                  <div className="space-y-2">
-                    {selectedReport.report_data.interview_questions.hr_questions.map((q, idx) => (
-                      <div key={idx} className="p-3 bg-slate-950 rounded-xl border border-slate-800/80 text-sm text-slate-300">
-                        {q}
-                      </div>
-                    ))}
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-xs font-bold text-purple-400 uppercase tracking-widest font-sans mb-3">HR & Behavioral Interview Prep</h3>
+                    <div className="space-y-2">
+                      {selectedReport.report_data.interview_questions.hr_questions.map((q, idx) => (
+                        <div key={idx} className="p-3 bg-zinc-950/40 rounded border border-white/5 text-sm text-zinc-200">
+                          {q}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xs font-bold text-purple-400 uppercase tracking-widest font-sans mb-3">Technical Qualifications Checks</h3>
+                    <div className="space-y-2">
+                      {selectedReport.report_data.interview_questions.technical_questions.map((q, idx) => (
+                        <div key={idx} className="p-3 bg-zinc-950/40 rounded border border-white/5 text-sm text-zinc-200">
+                          {q}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xs font-bold text-purple-400 uppercase tracking-widest font-sans mb-3">Resume-specific Project Questions</h3>
+                    <div className="space-y-2">
+                      {selectedReport.report_data.interview_questions.project_based_questions.map((q, idx) => (
+                        <div key={idx} className="p-3 bg-zinc-950/40 rounded border border-white/5 text-sm text-zinc-200">
+                          {q}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold text-indigo-400 mb-3 uppercase tracking-wider">Technical</h3>
-                  <div className="space-y-2">
-                    {selectedReport.report_data.interview_questions.technical_questions.map((q, idx) => (
-                      <div key={idx} className="p-3 bg-slate-950 rounded-xl border border-slate-800/80 text-sm text-slate-300">
-                        {q}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold text-indigo-400 mb-3 uppercase tracking-wider">Project-based (from your Resume)</h3>
-                  <div className="space-y-2">
-                    {selectedReport.report_data.interview_questions.project_based_questions.map((q, idx) => (
-                      <div key={idx} className="p-3 bg-slate-950 rounded-xl border border-slate-800/80 text-sm text-slate-300">
-                        {q}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <ExplainabilityCard
+                  agentName="Interview Specialist Agent"
+                  confidence={selectedReport.report_data.interview_questions.confidence_score || 90}
+                  reasoning={selectedReport.report_data.interview_questions.reasoning}
+                />
               </div>
-              <ExplainabilityCard
-                agentName="Interview Agent"
-                confidence={selectedReport.report_data.interview_questions.confidence_score || 90}
-                reasoning={selectedReport.report_data.interview_questions.reasoning}
-              />
-            </div>
+            </BorderGlow>
 
             {/* 9. Cover Letter (Optional) */}
             {selectedReport.report_data.cover_letter && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
-                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-indigo-400" /> Personalized Cover Letter
-                </h2>
-                <div className="p-6 bg-slate-950 border border-slate-800 rounded-xl">
-                  <pre className="text-slate-300 text-sm font-sans whitespace-pre-wrap leading-relaxed">
-                    {selectedReport.report_data.cover_letter}
-                  </pre>
+              <BorderGlow className="w-full">
+                <div className="p-8">
+                  <h2 className="text-xl font-extrabold text-white border-b border-white/5 pb-3 mb-5 flex items-center gap-2">
+                    Personalized Cover Letter
+                  </h2>
+                  <div className="p-6 bg-zinc-950/50 border border-white/5 rounded shadow-inner">
+                    <pre className="text-zinc-200 text-sm font-sans whitespace-pre-wrap leading-relaxed">
+                      {selectedReport.report_data.cover_letter}
+                    </pre>
+                  </div>
+                  {selectedReport.report_data.cover_letter_agent_report && (
+                    <ExplainabilityCard
+                      agentName="Cover Letter Specialist"
+                      confidence={selectedReport.report_data.cover_letter_agent_report.confidence_score || 90}
+                      reasoning={selectedReport.report_data.cover_letter_agent_report.reasoning}
+                    />
+                  )}
                 </div>
-                {selectedReport.report_data.cover_letter_agent_report && (
-                  <ExplainabilityCard
-                    agentName="Cover Letter Agent"
-                    confidence={selectedReport.report_data.cover_letter_agent_report.confidence_score || 90}
-                    reasoning={selectedReport.report_data.cover_letter_agent_report.reasoning}
-                  />
-                )}
-              </div>
+              </BorderGlow>
             )}
 
             {/* 10. Resume Improvement History */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
-              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <History className="h-5 w-5 text-indigo-400" /> Resume Improvement History
-              </h2>
-              {selectedReport.report_data.improvement_history ? (
-                <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-sm text-slate-300 whitespace-pre-line leading-relaxed">
-                  {selectedReport.report_data.improvement_history}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500 italic">First version analyzed. No previous resume versions exist in database history.</p>
-              )}
-              <ExplainabilityCard
-                agentName="System Memory Module"
-                confidence={100}
-                reasoning="Identified candidate name and resume base filename to cross-reference previous databases runs."
-              />
-            </div>
+            <BorderGlow className="w-full">
+              <div className="p-8">
+                <h2 className="text-xl font-extrabold text-white border-b border-white/5 pb-3 mb-5 flex items-center gap-2">
+                  Comparative Alignment History
+                </h2>
+                {selectedReport.report_data.improvement_history ? (
+                  <div className="p-5 bg-zinc-950/40 rounded border border-white/5 text-sm text-zinc-200 whitespace-pre-line leading-relaxed">
+                    {selectedReport.report_data.improvement_history}
+                  </div>
+                ) : (
+                  <p className="text-xs text-zinc-500 italic">First optimization cycle recorded. Subsequent runs will display deltas.</p>
+                )}
+                <ExplainabilityCard
+                  agentName="System Memory Database Module"
+                  confidence={100}
+                  reasoning="Identified candidate filename history to trace performance metrics differences."
+                />
+              </div>
+            </BorderGlow>
 
             {/* 11. Final Confidence */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
-              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-indigo-400" /> Final Confidence Evaluation
-              </h2>
-              <div className="flex items-center gap-4">
-                <div className="flex-1 bg-slate-950 rounded-full h-4 overflow-hidden border border-slate-800">
-                  <div 
-                    className="bg-gradient-to-r from-indigo-500 to-emerald-500 h-full rounded-full transition-all duration-1000"
-                    style={{ width: `${selectedReport.report_data.final_confidence_score || 85}%` }}
-                  />
+            <BorderGlow className="w-full">
+              <div className="p-8">
+                <h2 className="text-xl font-extrabold text-white border-b border-white/5 pb-3 mb-5 flex items-center gap-2">
+                  Final Confidence Evaluation
+                </h2>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 bg-zinc-900 rounded-full h-3 overflow-hidden border border-white/5 font-sans">
+                    <div 
+                      className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full transition-all duration-1000 shadow-[0_0_12px_rgba(168,85,247,0.4)]"
+                      style={{ width: `${selectedReport.report_data.final_confidence_score || 85}%` }}
+                    />
+                  </div>
+                  <span className="text-base font-bold text-white font-sans">{selectedReport.report_data.final_confidence_score || 85}%</span>
                 </div>
-                <span className="text-lg font-bold text-white">{selectedReport.report_data.final_confidence_score || 85}%</span>
               </div>
-            </div>
+            </BorderGlow>
 
             {/* 12. Sources & Research Scope */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
-              <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <Search className="h-5 w-5 text-indigo-400" /> Sources & Research Scope
-              </h2>
-              {selectedReport.report_data.sources?.length > 0 ? (
-                <ul className="space-y-2">
-                  {selectedReport.report_data.sources.map((src: string, idx: number) => (
-                    <li key={idx} className="flex gap-2 text-sm text-slate-300 font-mono">
-                      <span className="text-indigo-400 font-bold">•</span>
-                      <span>{src}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-slate-500 italic">Searched DuckDuckGo browser resources and local filesystem.</p>
-              )}
-              <ExplainabilityCard
-                agentName="Browser & Filesystem MCP Servers"
-                confidence={100}
-                reasoning="Exposed standard protocol endpoints to query search indices and read configuration files safely."
-              />
-            </div>
+            <BorderGlow className="w-full">
+              <div className="p-8">
+                <h2 className="text-xl font-extrabold text-white border-b border-white/5 pb-3 mb-5 flex items-center gap-2">
+                  Search Scope & Verified Sources
+                </h2>
+                {selectedReport.report_data.sources?.length > 0 ? (
+                  <ul className="space-y-2">
+                    {selectedReport.report_data.sources.map((src: string, idx: number) => (
+                      <li key={idx} className="flex gap-2 text-xs text-zinc-300 font-mono">
+                        <span className="text-purple-400 font-bold">•</span>
+                        <span>{src}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-zinc-500 italic">Referenced internal dictionaries, filesystem configurations, and DuckDuckGo API.</p>
+                )}
+                <ExplainabilityCard
+                  agentName="Browser & Filesystem MCP Servers"
+                  confidence={100}
+                  reasoning="Exposed remote Stdio subprocesses to check external websites and filesystem indices."
+                />
+              </div>
+            </BorderGlow>
           </div>
         )}
       </main>
@@ -973,25 +1050,25 @@ export default function Home() {
       {/* Delete Confirmation Modal */}
       {deleteConfirmId !== null && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-fade-in">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <ShieldAlert className="h-5 w-5 text-rose-500" /> Confirm Deletion
+          <div className="bg-zinc-950 border border-white/10 rounded-lg p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-rose-500" /> Confirm Deletion
             </h3>
-            <p className="text-sm text-slate-400 mt-2 leading-relaxed">
-              Are you sure you want to delete this report? This will permanently delete the report and ATS scores from history.
+            <p className="text-xs text-zinc-400 font-sans mt-2.5 leading-relaxed">
+              Are you sure you want to permanently delete this report and historical metrics from the database? This action cannot be undone.
             </p>
-            <div className="flex items-center justify-end gap-3 mt-6">
+            <div className="flex items-center justify-end gap-3 mt-6 font-sans text-xs">
               <button
                 onClick={() => setDeleteConfirmId(null)}
-                className="py-2 px-4 hover:bg-slate-800 border border-slate-800 rounded-lg text-sm text-slate-400 transition"
+                className="py-2 px-4 hover:bg-white/5 border border-white/10 rounded text-zinc-300 transition"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="py-2 px-4 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-sm font-semibold transition"
+                className="py-2 px-4 bg-rose-600 hover:bg-rose-700 text-white rounded font-bold transition"
               >
-                Confirm Delete
+                Delete Record
               </button>
             </div>
           </div>

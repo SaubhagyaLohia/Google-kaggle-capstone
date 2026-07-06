@@ -71,12 +71,19 @@ class SecurityAgent:
                 reason: str = Field(description="Explanation of the safety determination")
                 
             client = Client()
+            # Filter and truncate large values to prevent token bloat
+            filtered_args = args.copy()
+            if "report_data_json" in filtered_args:
+                filtered_args["report_data_json"] = f"<JSON String, Length: {len(filtered_args['report_data_json'])}>"
+            if "content" in filtered_args and len(filtered_args["content"]) > 1000:
+                filtered_args["content"] = filtered_args["content"][:1000] + "... [truncated]"
+                
             prompt = f"""You are the Security Agent guarding all external filesystem, database, and web search operations in the Career Copilot application.
             Analyze the requested action and decide if it violates safety guidelines.
             
             Workspace Directory: {workspace_root}
             Requested Action: {tool_name}
-            Arguments: {json.dumps(args)}
+            Arguments: {json.dumps(filtered_args)}
             
             Safety Rules:
             1. Filesystem paths MUST be within the Workspace Directory. Any path starting with "{workspace_root}" is safe. Traversal (like '../' or paths outside that root) is strictly prohibited.
@@ -88,7 +95,7 @@ class SecurityAgent:
             Determine if this request is safe and provide your reasoning."""
             
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 contents=prompt,
                 config={
                     "response_mime_type": "application/json",
